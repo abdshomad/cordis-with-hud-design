@@ -17,6 +17,7 @@
 - Read: `plans/cycle_state.json` -> `plans/next-enhancements.md` -> `docs/feature-list/`.
 - Increment `cycle_state.json` (+1). Plan 1–5 high-impact, non-duplicate tasks (tags: 🖌 UI-simplification / ⚙ automation / ⚡ performance / 🔌 plugin-service).
 - Unique ID `<feature>.<subfeature>.<seq>` (scan `plans/`, `max+1`). One sub-plan `plans/plan-<X.Y.Z>-<slug>.md` per task.
+- Plan commit format: one-line header with cycle & tasks (`plan(cycle-<N>): <summary> (<start> - <end>)`), followed by itemized bullet changes.
 
 ## §2 — Trigger "n" (Next / Execute)
 - Resolve open findings in `plans/reviews/`. Execute `[TODO]` task(s) sequentially adhering to submodule boundaries.
