@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unified SAM3 Workspace - EZ Lab Lite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/hud_thumbnails.css" />
+  <link rel="stylesheet" href="css/hud_drawer.css" />
+  <link rel="stylesheet" href="css/hud_sidesheet.css" />
+  <link rel="stylesheet" href="css/hud_sidesheet_thumbs.css" />
+  <link rel="stylesheet" href="css/hud_stepper.css" />
+  <link rel="stylesheet" href="css/toast.css" />
+  <link rel="stylesheet" href="css/standardized_buttons.css" />
+  <link rel="stylesheet" href="css/standardized_buttons_sidesheet.css" />
+  <link rel="stylesheet" href="css/standardized_popover_buttons.css" />
+  <link rel="stylesheet" href="css/gpu_manager.css" />
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js"></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"></script>
+</head>
+<body class="workspace-body">
+  
+  <div id="workspace-app" class="workspace-fullscreen" data-playlist="dolphin" data-targets="dolphin">
+    
+    <!-- Edge-to-Edge Keyframe Canvas -->
+    <div class="canvas-viewport" id="canvas-viewport">
+      <img id="main-frame-img" class="canvas-viewport__img" src="" alt="Keyframe Canvas" />
+      <svg id="canvas-svg-overlay" class="canvas-viewport__svg"></svg>
+      <div id="canvas-loader" class="canvas-viewport__loader hidden">
+        <div class="spinner"></div>
+        <span>Loading keyframe...</span>
+      </div>
+    </div>
+
+    <!-- Floating Top HUD Header -->
+    <header class="hud-topbar">
+      <div class="hud-topbar__left">
+        <a href="#" class="hud-topbar__brand">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+          </svg>
+          <span class="hud-topbar__title">EZ Lab</span>
+        </a>
+        <span class="hud-badge">DS: DOLPHIN</span>
+        <!-- Hidden model status badges for JavaScript compatibility -->
+        <span id="sam3-model-badge" class="hidden hud-badge--sam3-online"></span>
+        <span id="resnet-model-badge" class="hidden hud-badge--sam3-online"></span>
+        <button id="btn-toggle-gpu" class="hud-btn hud-btn--gpu" onclick="window.GpuManager.togglePanel()" style="margin-left: 8px; font-size: 11px; padding: 2px 8px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s ease;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle;"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3M9 9h6v6H9z"/></svg>
+          GPU
+        </button>
+        <button id="btn-start-sam3" class="hud-btn hud-btn--start-sam3 hidden" onclick="window.ViewerApp.startSam3Service()" style="margin-left: 8px; font-size: 11px; padding: 2px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #60a5fa; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: all 0.2s ease;">
+          ▶ Start SAM3
+        </button>
+      </div>
+
+      <div class="hud-topbar__center">
+        <div class="hud-counter">
+          <button id="btn-prev-frame" class="hud-icon-btn" title="Previous Frame [A / ←]">‹</button>
+          <span id="hud-frame-counter">Frame 1 of 3</span>
+          <button id="btn-next-frame" class="hud-icon-btn" title="Next Frame [D / →]">›</button>
+        </div>
+      </div>
+
+      <div class="hud-topbar__right">
+        <div class="hud-slider-group" title="Filter Detections by Minimum Confidence">
+          <span class="hud-slider-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+            <strong id="conf-threshold-val">0%</strong>
+          </span>
+          <input type="range" id="confidence-slider" min="0" max="100" step="5" value="0" class="hud-range-slider" />
+        </div>
+        <div class="hud-stepper-group" id="hud-frame-stepper-wrapper" title="Horizontal Frame Extraction Stepper">
+  <span class="hud-stepper__label" title="Target Frame Extraction Tier">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+      <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+      <line x1="7" y1="2" x2="7" y2="22"/>
+      <line x1="17" y1="2" x2="17" y2="22"/>
+      <line x1="2" y1="12" x2="22" y2="12"/>
+    </svg>
+    Frames:
+  </span>
+  <div class="hud-stepper__list" id="hud-frame-stepper" data-total-frames="3">
+    <!-- Stepper items hydrated dynamically by frame_stepper.js -->
+  </div>
+</div>
+        <div class="hud-mode-group hidden" style="display:flex; gap:4px; margin-right:6px;" title="Workspace Interaction Mode">
+          <button id="btn-mode-select" class="hud-btn hud-btn--icon hud-btn--active" title="Select / Inspect Mode [S]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+          </button>
+          <button id="btn-mode-draw" class="hud-btn hud-btn--icon" title="Draw Box Prompt Mode [B]">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/><path d="M12 8v8M8 12h8"/></svg>
+          </button>
+        </div>
+        <button id="btn-segment-all-boxes" class="hud-btn hud-btn--accent hud-btn--icon hidden" title="Process & Segment All Drawn Boxes with SAM3">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </button>
+        <button id="btn-toggle-mask" class="hud-btn hud-btn--icon hud-btn--active hidden" title="Toggle SAM3 Overlay [M]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button id="btn-toggle-labels" class="hud-btn hud-btn--icon hud-btn--active" title="Toggle BBox Labels [L]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        </button>
+        <button id="btn-run-sam3-topbar" class="hud-btn hud-btn--accent hud-btn--icon hidden" title="Trigger SAM3 Detection on Current Video [R]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M2.5 16l1.2 1.2A10 10 0 0 0 22 12.5"/></svg>
+        </button>
+        <button id="btn-render-dataset" class="hud-btn hud-btn--icon" title="Render Dataset [Shift+E]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </button>
+        <button id="btn-open-json" class="hud-btn hud-btn--icon hidden" title="View JSON Metadata [J]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </button>
+        <button id="btn-zoom-reset" class="hud-btn" style="font-size:11px; font-weight:600; padding:4px 8px; cursor:pointer;" title="Reset Zoom to 100% [0]">🔍 <span id="zoom-level-text">100%</span></button>
+        <button id="btn-toggle-fit-widgets" class="hud-btn hud-btn--icon hidden" title="Toggle Fit Canvas Between Side Widgets [Shift+W]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>
+        </button>
+        <button id="btn-toggle-zen" class="hud-btn hud-btn--icon hidden" onclick="window.toggleZenMode && window.toggleZenMode()" title="Toggle Clean View / Zen Mode [Z]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        </button>
+        <button id="btn-open-help" class="hud-btn hud-btn--icon hidden" title="Keyboard Shortcuts Help [?]">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Collapsible Left Frame Drawer -->
+    <aside id="left-drawer" class="hud-drawer hud-drawer--left">
+      <div class="hud-drawer__toggle-group">
+        <button id="btn-toggle-left-drawer" class="hud-drawer__toggle" title="Toggle Completely [Hide/Show]">‹</button>
+        <button id="btn-minimize-left-drawer" class="hud-drawer__toggle hud-drawer__toggle--minimize" title="Minimize to Image Thumbnails">🖼</button>
+      </div>
+      <div class="hud-drawer__header">
+        <h4 class="hud-drawer__title">Keyframe Strip</h4>
+        <div class="hud-drawer__header-right">
+          <select id="select-page-size" class="hud-select-mini" title="Select Thumbnails Per Page">
+            <option value="10">10/pg</option>
+            <option value="20" selected>20/pg</option>
+            <option value="50">50/pg</option>
+            <option value="100">100/pg</option>
+          </select>
+          <span class="hud-drawer__count">3 F</span>
+        </div>
+      </div>
+      <div id="thumbnail-strip" class="hud-drawer__content">
+        <!-- Dynamic thumbnails inserted by JS -->
+      </div>
+    </aside>
+
+    <!-- Collapsible Right Verification & Annotation Side-Sheet -->
+    <aside id="right-sidesheet" class="hud-sidesheet">
+      <button id="btn-toggle-right-sidesheet" class="hud-sidesheet__toggle" title="Toggle Side Panel">›</button>
+      <div class="hud-sidesheet__header">
+        <h3 class="hud-sidesheet__title">Object Annotations</h3>
+      </div>
+
+      <div class="hud-sidesheet__content">
+
+        <!-- Detections List -->
+<div class="sidesheet-card">
+  <div class="sidesheet-card__header" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+    <label class="sidesheet-label">Detected Objects (<span id="det-count">0</span>)</label>
+    <div class="det-size-selector" id="det-size-selector" style="display:flex; gap:4px; align-items:center;">
+      <button class="det-size-btn" data-size="small" title="Small Thumbnails (32px)" style="background:none; border:none; padding:2px; cursor:pointer; color:#9ca3af; display:inline-flex; align-items:center; justify-content:center; transition:color 0.2s;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+      </button>
+      <button class="det-size-btn det-size-btn--active" data-size="medium" title="Medium Thumbnails (44px)" style="background:none; border:none; padding:2px; cursor:pointer; color:#38bdf8; display:inline-flex; align-items:center; justify-content:center; transition:color 0.2s;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+      </button>
+      <button class="det-size-btn" data-size="big" title="Big Thumbnails (60px)" style="background:none; border:none; padding:2px; cursor:pointer; color:#9ca3af; display:inline-flex; align-items:center; justify-content:center; transition:color 0.2s;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="2" width="20" height="20" rx="2.5"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="sidesheet-card__actions" style="margin-top: 8px; margin-bottom: 8px;">
+    <button id="btn-reprocess-frame" class="hud-btn hud-btn--accent" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;" title="Re-run SAM3 text-prompt detection on this frame">
+      🔄 Reprocess SAM3
+    </button>
+  </div>
+  <div id="side-detections-list" class="detections-list detections-list--medium"></div>
+</div>
+
+        <!-- Dedicated Dataset Label Management Card -->
+<div class="sidesheet-card" id="label-management-card">
+  <div class="sidesheet-card__header" style="display:flex; justify-content:space-between; align-items:center;">
+    <label class="sidesheet-label" style="margin-bottom:0;">🏷️ Dataset Label Management</label>
+    <span id="active-label-count-badge" class="badge" style="background:rgba(139,92,246,0.15); color:#a78bfa; border:1px solid rgba(139,92,246,0.3); font-size:10px; padding:1px 6px; border-radius:4px;">0 labels</span>
+  </div>
+  
+  <p style="font-size:11px; color:#94a3b8; margin:6px 0 10px 0; line-height:1.4;">
+    Comma-separated dataset labels for object detection & prompt classification.
+  </p>
+
+  <div style="display:flex; gap:6px; margin-bottom:8px;">
+    <input type="text" id="dataset-labels-csv-input" class="sidesheet-input" style="flex:1; font-family:monospace; font-size:12px;" placeholder="e.g. helmet, vest, boot" />
+    <button id="btn-save-dataset-labels" class="hud-btn hud-btn--accent" style="padding:4px 10px; font-size:12px; white-space:nowrap;" title="Save & Sanitize CSV Labels">
+      💾 Save
+    </button>
+  </div>
+
+  <div id="dataset-labels-chips-list" style="display:flex; flex-wrap:wrap; gap:4px; min-height:24px; margin-bottom:10px;">
+    <!-- Rendered dynamically by JS -->
+  </div>
+
+  <div style="border-top:1px solid #334155; padding-top:10px; margin-top:8px;">
+    <button id="btn-open-dataset-viewer" class="hud-btn hud-btn--purple" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; font-weight:600;" onclick="if(window.DatasetViewer) window.DatasetViewer.open()">
+      🖼️ Open Dataset Sample Images
+    </button>
+  </div>
+</div>
+
+        <!-- Propagation Actions -->
+<div class="sidesheet-card">
+  <label class="sidesheet-label" style="display: flex; align-items: center;">
+    <span>Propagate BBoxes (SAM3)</span>
+    <span style="background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; margin-left: 6px; letter-spacing: 0.05em;">Experimental</span>
+  </label>
+  <div class="hud-propagation-group" style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+    <span style="font-size:12px; color:#9ca3af; white-space:nowrap;">Frames Count:</span>
+    <select id="propagate-count-select" class="sidesheet-input" style="padding:4px 8px; width: auto; flex:1;" title="Number of target frames to propagate bboxes to">
+      <option value="1" selected>1 Frame</option>
+      <option value="2">2 Frames</option>
+      <option value="3">3 Frames</option>
+      <option value="5">5 Frames</option>
+      <option value="10">10 Frames</option>
+    </select>
+  </div>
+  <div class="hud-propagation-group" style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+    <span style="font-size:12px; color:#9ca3af; white-space:nowrap;">BBox Expansion:</span>
+    <select id="propagate-expand-select" class="sidesheet-input" style="padding:4px 8px; width: auto; flex:1;" title="Expand bounding box prompt area for SAM3 segmentation">
+      <option value="0">0% (Exact)</option>
+      <option value="5">5%</option>
+      <option value="10" selected>10% (Default)</option>
+      <option value="15">15%</option>
+      <option value="20">20%</option>
+      <option value="25">25%</option>
+    </select>
+  </div>
+  <div class="verification-btn-group">
+    <button id="btn-propagate-prev" class="hud-btn hud-btn--flag" style="font-size:12px; flex:1; justify-content:center;" title="Propagate BBoxes to Previous Frame(s) [Ctrl + ←]">
+      ◀ Propagate
+    </button>
+    <button id="btn-propagate-next" class="hud-btn hud-btn--verify" style="font-size:12px; flex:1; justify-content:center;" title="Propagate BBoxes to Next Frame(s) [Ctrl + →]">
+      Propagate ▶
+    </button>
+  </div>
+</div>
+
+<!-- Keyframe Span Extractor -->
+<div class="sidesheet-card" style="margin-top: 10px;">
+  <label class="sidesheet-label" style="display: flex; align-items: center;">
+    <span>⏱️ Keyframe Span Extractor</span>
+    <span style="background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; margin-left: 6px; letter-spacing: 0.05em;">Experimental</span>
+  </label>
+  <div class="hud-propagation-group" style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+    <span style="font-size:12px; color:#9ca3af; white-space:nowrap;">Frame Count (X):</span>
+    <select id="span-count-select" class="sidesheet-input" style="padding:4px 8px; width: auto; flex:1;" title="Number of keyframes to extract (X)">
+      <option value="1">1 Frame</option>
+      <option value="2">2 Frames</option>
+      <option value="3" selected>3 Frames (Default)</option>
+      <option value="5">5 Frames</option>
+      <option value="10">10 Frames</option>
+    </select>
+  </div>
+  <div class="hud-propagation-group" style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+    <span style="font-size:12px; color:#9ca3af; white-space:nowrap;">Step Interval (Y):</span>
+    <select id="span-step-select" class="sidesheet-input" style="padding:4px 8px; width: auto; flex:1;" title="Frame step interval between extractions (Y)">
+      <option value="1">1 Frame Step</option>
+      <option value="5">5 Frames Step</option>
+      <option value="10">10 Frames Step</option>
+      <option value="15">15 Frames Step</option>
+      <option value="30" selected>30 Frames Step (1s)</option>
+    </select>
+  </div>
+  <div id="span-overfit-warning" style="display:none; background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); color:#fca5a5; font-size:11px; padding:4px 8px; border-radius:4px; margin-bottom:8px; display:flex; align-items:center; gap:4px;">
+    <span>⚠️ Overfitting Risk: Close Frames (<15f)</span>
+  </div>
+  <div class="verification-btn-group" style="display:flex; flex-direction:column; gap:4px;">
+    <button id="btn-span-prev" class="hud-btn hud-btn--flag" style="font-size:11px; padding: 6px 8px; width:100%; justify-content:center;" title="Extract Prev X frames with Y step immediately into Keyframe Strip">
+      ◀ Prev
+    </button>
+    <button id="btn-span-both" class="hud-btn hud-btn--active" style="font-size:11px; padding: 6px 8px; width:100%; justify-content:center;" title="Extract Both Prev & Next X frames with Y step immediately into Keyframe Strip">
+      Both
+    </button>
+    <button id="btn-span-next" class="hud-btn hud-btn--verify" style="font-size:11px; padding: 6px 8px; width:100%; justify-content:center;" title="Extract Next X frames with Y step immediately into Keyframe Strip">
+      Next ▶
+    </button>
+  </div>
+  <div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+    <button id="btn-run-sam3-span" class="hud-btn hud-btn--accent" style="font-size:11px; padding: 6px 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;" title="Run SAM3 detection model on recently extracted span keyframes">
+      ⚡ Run SAM3 Spans
+    </button>
+  </div>
+  <div id="span-progress-container" style="display:none; margin-top:8px;">
+    <div style="font-size:11px; color:#38bdf8; display:flex; justify-content:space-between; margin-bottom:3px;">
+      <span id="span-progress-text">Processing span keyframes...</span>
+      <span id="span-progress-percent">0%</span>
+    </div>
+    <div style="width:100%; height:4px; background:rgba(255,255,255,0.1); border-radius:2px; overflow:hidden;">
+      <div id="span-progress-fill" style="width:0%; height:100%; background:linear-gradient(90deg, #6366f1, #38bdf8); transition:width 0.3s ease;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Detect by Sample Crop -->
+<div class="sidesheet-card" style="margin-top: 10px;">
+  <label class="sidesheet-label" style="display: flex; align-items: center;">
+    <span>🔍 Detect by Sample Crop</span>
+    <span style="background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; text-transform: uppercase; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; margin-left: 6px; letter-spacing: 0.05em;">Experimental</span>
+  </label>
+  <p style="font-size:11px; color:#9ca3af; margin:4px 0 8px 0; line-height:1.4;">
+    Matches SAM3 candidate proposals against your manually drawn box crops using crop embeddings.
+  </p>
+  <div class="hud-propagation-group" style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+    <span style="font-size:12px; color:#9ca3af; white-space:nowrap;">Match Threshold:</span>
+    <input type="range" id="crop-match-threshold" min="0.50" max="0.95" step="0.05" value="0.65" style="flex:1; accent-color:#06b6d4;" oninput="document.getElementById('crop-match-threshold-val').textContent = Math.round(this.value * 100) + '%'"/>
+    <span id="crop-match-threshold-val" style="font-size:12px; color:#38bdf8; font-weight:700; width:36px; text-align:right;">65%</span>
+  </div>
+  <button id="btn-detect-by-sample-crop" class="hud-btn hud-btn--accent" style="font-size:11px; padding: 6px 10px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;" title="Run visual similarity matching using your manual bounding box crops">
+    🔍 Run Crop Matcher
+  </button>
+</div>
+
+
+      </div>
+    </aside>
+
+    <!-- Floating Popover Action Widget for Selected Canvas Object -->
+    <div id="popover-action-bar" class="hud-popover hidden">
+      <button id="btn-popover-segment" class="hud-popover__btn hidden" title="Segment Object [G]">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span class="hud-popover__badge hidden"></span>
+      </button>
+      <button id="btn-popover-classify-this" class="hud-popover__btn hidden" title="Re-classify Object">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button id="btn-popover-crop-train" class="hud-popover__btn" title="Crop & Sample Object [C]">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>
+        <span class="hud-popover__badge hidden"></span>
+      </button>
+      <button id="btn-popover-delete" class="hud-popover__btn" title="Delete Object [X]">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        <span class="hud-popover__badge hidden"></span>
+      </button>
+      <button class="hud-popover__close" onclick="ViewerApp.deselectAll()">×</button>
+    </div>
+
+    <!-- Floating Background Task status container -->
+    <div id="sam3-status-container" class="hud-status-container-bottom" >
+      <div class="hud-status-widget">
+  <div class="hud-status-widget__text">
+    <span class="hud-status-widget__dot hud-status-widget__dot--complete"></span>
+    <span class="hud-status-widget__label">SAM3: ONLINE</span>
+  </div>
+  
+</div>
+<script>
+  if (window.ViewerApp && window.ViewerApp.updateDatasetFromPolling) {
+    window.ViewerApp.updateDatasetFromPolling([{"frames": [{"detections": [{"bbox_normalized": [0.734, 0.407, 0.81, 0.458], "bbox_xyxy": [793, 781, 875, 879], "confidence": 0.953, "deleted": false, "id": "user_box_1784790088723", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 6268, "mask_color": "#8B5CF6", "polygon": [[793, 783], [794, 792], [826, 823], [851, 861], [868, 878], [872, 879], [873, 861], [875, 856], [874, 848], [850, 832], [827, 805], [818, 784], [811, 781]], "polygons": [[[793, 783], [794, 792], [826, 823], [851, 861], [868, 878], [872, 879], [873, 861], [875, 856], [874, 848], [850, 832], [827, 805], [818, 784], [811, 781]]]}, {"bbox_normalized": [0.748, 0.45, 0.768, 0.481], "bbox_xyxy": [808, 864, 829, 924], "confidence": 0.883, "deleted": false, "id": "user_box_1784792260041", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 982, "mask_color": "#8B5CF6", "polygon": [[819, 864], [815, 867], [813, 872], [809, 876], [809, 879], [808, 880], [809, 916], [820, 924], [823, 924], [828, 920], [828, 918], [829, 917], [829, 903], [828, 902], [828, 898], [827, 897], [827, 894], [825, 889], [825, 885], [824, 884], [824, 882], [822, 878], [822, 875], [821, 874], [821, 868]], "polygons": [[[819, 864], [815, 867], [813, 872], [809, 876], [809, 879], [808, 880], [809, 916], [820, 924], [823, 924], [828, 920], [828, 918], [829, 917], [829, 903], [828, 902], [828, 898], [827, 897], [827, 894], [825, 889], [825, 885], [824, 884], [824, 882], [822, 878], [822, 875], [821, 874], [821, 868]]]}, {"bbox_normalized": [0.667, 0.38, 0.719, 0.412], "bbox_xyxy": [720, 729, 777, 792], "confidence": 0.914, "deleted": false, "id": "user_box_1784894230989", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 2800, "mask_color": "#8B5CF6", "polygon": [[725, 729], [720, 736], [723, 749], [726, 753], [729, 764], [733, 772], [746, 783], [752, 785], [760, 791], [774, 792], [776, 790], [777, 783], [775, 776], [770, 769], [752, 750], [745, 738], [740, 733], [733, 729]], "polygons": [[[725, 729], [720, 736], [723, 749], [726, 753], [729, 764], [733, 772], [746, 783], [752, 785], [760, 791], [774, 792], [776, 790], [777, 783], [775, 776], [770, 769], [752, 750], [745, 738], [740, 733], [733, 729]]]}], "frame_index": 0, "height": 1920, "image_url": "assets/8kUHBdHqE2s_frame_00000.jpg", "is_processed": true, "json_filename": "8kUHBdHqE2s_frame_00000_sam3.json", "json_url": "assets/8kUHBdHqE2s_frame_00000_sam3.json", "min_confidence": 0.0, "raw_image_url": "assets/8kUHBdHqE2s_frame_00000.jpg", "target_prompts": ["dolphin"], "thumbnail_url": "assets/thumbs/8kUHBdHqE2s_frame_00000.jpg", "timestamp_sec": 0.0, "verification": {"deleted_detections": ["user_box_1784770934569", "user_box_1784771077779", "user_box_1784780161318"], "json_filename": "8kUHBdHqE2s_frame_00000_verify.json", "status": "modified", "updated_at": "2026-07-23T04:26:47.334020+00:00", "video_id": "8kUHBdHqE2s"}, "video_id": "8kUHBdHqE2s", "width": 1080}, {"detections": [{"bbox_normalized": [0.723, 0.409, 0.803, 0.463], "bbox_xyxy": [781, 785, 867, 889], "confidence": 0.123, "deleted": true, "id": "sam3_det_001", "label": "dolphin", "mask_area_px": 8944, "mask_color": "#8B5CF6", "polygon": [[781, 789], [784, 796], [803, 812], [812, 822], [835, 857], [852, 876], [856, 885], [860, 889], [863, 889], [864, 870], [867, 856], [861, 853], [843, 835], [837, 832], [822, 818], [812, 803], [811, 795], [807, 787], [795, 785], [789, 788]], "polygons": [[[781, 789], [784, 796], [803, 812], [812, 822], [835, 857], [852, 876], [856, 885], [860, 889], [863, 889], [864, 870], [867, 856], [861, 853], [843, 835], [837, 832], [822, 818], [812, 803], [811, 795], [807, 787], [795, 785], [789, 788]]]}, {"bbox_normalized": [0.668, 0.379, 0.717, 0.414], "bbox_xyxy": [721, 728, 774, 795], "confidence": 0.891, "deleted": false, "id": "user_box_1784790064634", "is_propagated": true, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 2769, "mask_color": "#8B5CF6", "polygon": [[725, 730], [721, 735], [722, 744], [727, 753], [738, 767], [740, 772], [750, 787], [754, 791], [761, 795], [766, 795], [770, 792], [772, 792], [774, 790], [774, 783], [763, 774], [758, 767], [748, 758], [738, 742], [733, 729], [729, 728]], "polygons": [[[725, 730], [721, 735], [722, 744], [727, 753], [738, 767], [740, 772], [750, 787], [754, 791], [761, 795], [766, 795], [770, 792], [772, 792], [774, 790], [774, 783], [763, 774], [758, 767], [748, 758], [738, 742], [733, 729], [729, 728]]]}, {"bbox_normalized": [0.734, 0.45, 0.756, 0.479], "bbox_xyxy": [793, 864, 816, 920], "confidence": 0.91, "deleted": false, "id": "user_box_1784790345486", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 1004, "mask_color": "#8B5CF6", "polygon": [[804, 864], [804, 865], [800, 869], [799, 872], [797, 874], [794, 881], [794, 885], [793, 886], [793, 892], [794, 893], [793, 912], [794, 913], [794, 915], [797, 918], [799, 918], [800, 919], [806, 919], [808, 920], [815, 917], [815, 915], [816, 914], [816, 909], [815, 908], [815, 905], [814, 904], [814, 902], [812, 898], [812, 895], [811, 894], [811, 889], [810, 888], [810, 884], [809, 883], [808, 875], [807, 874], [807, 868]], "polygons": [[[804, 864], [804, 865], [800, 869], [799, 872], [797, 874], [794, 881], [794, 885], [793, 886], [793, 892], [794, 893], [793, 912], [794, 913], [794, 915], [797, 918], [799, 918], [800, 919], [806, 919], [808, 920], [815, 917], [815, 915], [816, 914], [816, 909], [815, 908], [815, 905], [814, 904], [814, 902], [812, 898], [812, 895], [811, 894], [811, 889], [810, 888], [810, 884], [809, 883], [808, 875], [807, 874], [807, 868]]]}, {"bbox_normalized": [0.721, 0.408, 0.805, 0.464], "bbox_xyxy": [779, 784, 869, 891], "confidence": 0.945, "deleted": false, "id": "user_box_1784797148511", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 7511, "mask_color": "#8B5CF6", "polygon": [[781, 786], [779, 788], [781, 794], [812, 823], [820, 838], [836, 860], [849, 873], [856, 886], [860, 890], [864, 891], [865, 868], [869, 856], [860, 852], [818, 813], [813, 805], [810, 791], [806, 786], [800, 784], [789, 787]], "polygons": [[[781, 786], [779, 788], [781, 794], [812, 823], [820, 838], [836, 860], [849, 873], [856, 886], [860, 890], [864, 891], [865, 868], [869, 856], [860, 852], [818, 813], [813, 805], [810, 791], [806, 786], [800, 784], [789, 787]]]}], "frame_index": 1, "height": 1920, "image_url": "assets/8kUHBdHqE2s_frame_00001.jpg", "is_processed": true, "json_filename": "8kUHBdHqE2s_frame_00001_sam3.json", "json_url": "assets/8kUHBdHqE2s_frame_00001_sam3.json", "min_confidence": 0.0, "raw_image_url": "assets/8kUHBdHqE2s_frame_00001.jpg", "target_prompts": ["dolphin"], "thumbnail_url": "assets/thumbs/8kUHBdHqE2s_frame_00001.jpg", "timestamp_sec": 1.0, "verification": {"deleted_detections": ["sam3_det_001"], "json_filename": "8kUHBdHqE2s_frame_00001_verify.json", "status": "modified", "updated_at": "2026-07-25T12:19:37.643018+00:00", "video_id": "8kUHBdHqE2s"}, "video_id": "8kUHBdHqE2s", "width": 1080}, {"detections": [{"bbox_normalized": [0.677, 0.392, 0.7, 0.416], "bbox_xyxy": [731, 753, 756, 798], "confidence": 0.136, "deleted": true, "id": "sam3_det_001", "label": "dolphin", "mask_area_px": 1125, "mask_color": "#8B5CF6", "polygon": [[732, 753], [731, 754], [731, 764], [732, 765], [733, 770], [735, 773], [736, 778], [738, 781], [738, 783], [741, 789], [743, 791], [743, 792], [748, 797], [750, 797], [752, 798], [756, 795], [756, 787], [755, 786], [755, 784], [753, 780], [750, 777], [749, 774], [740, 764], [737, 757], [733, 753]], "polygons": [[[732, 753], [731, 754], [731, 764], [732, 765], [733, 770], [735, 773], [736, 778], [738, 781], [738, 783], [741, 789], [743, 791], [743, 792], [748, 797], [750, 797], [752, 798], [756, 795], [756, 787], [755, 786], [755, 784], [753, 780], [750, 777], [749, 774], [740, 764], [737, 757], [733, 753]]]}, {"bbox_normalized": [0.71, 0.409, 0.796, 0.467], "bbox_xyxy": [767, 786, 860, 896], "confidence": 0.157, "deleted": true, "id": "sam3_det_002", "label": "dolphin", "mask_area_px": 10230, "mask_color": "#8B5CF6", "polygon": [[769, 787], [767, 789], [769, 796], [775, 803], [801, 824], [829, 866], [840, 878], [846, 888], [856, 896], [857, 889], [855, 876], [860, 862], [848, 855], [830, 835], [818, 828], [803, 813], [801, 809], [801, 796], [797, 789], [788, 786]], "polygons": [[[769, 787], [767, 789], [769, 796], [775, 803], [801, 824], [829, 866], [840, 878], [846, 888], [856, 896], [857, 889], [855, 876], [860, 862], [848, 855], [830, 835], [818, 828], [803, 813], [801, 809], [801, 796], [797, 789], [788, 786]]]}, {"bbox_normalized": [0.72, 0.45, 0.741, 0.481], "bbox_xyxy": [778, 864, 800, 924], "confidence": 0.129, "deleted": true, "id": "sam3_det_003", "label": "dolphin", "mask_area_px": 1320, "mask_color": "#8B5CF6", "polygon": [[791, 864], [789, 864], [781, 875], [780, 879], [778, 882], [778, 890], [780, 895], [780, 903], [778, 908], [778, 917], [780, 921], [784, 924], [792, 924], [797, 919], [800, 911], [800, 903], [798, 899], [797, 891], [796, 890], [796, 884], [794, 879], [793, 867]], "polygons": [[[791, 864], [789, 864], [781, 875], [780, 879], [778, 882], [778, 890], [780, 895], [780, 903], [778, 908], [778, 917], [780, 921], [784, 924], [792, 924], [797, 919], [800, 911], [800, 903], [798, 899], [797, 891], [796, 890], [796, 884], [794, 879], [793, 867]]]}, {"bbox_normalized": [0.71, 0.409, 0.742, 0.426], "bbox_xyxy": [767, 786, 801, 817], "confidence": 0.111, "deleted": true, "id": "sam3_det_004", "label": "dolphin", "mask_area_px": 1054, "mask_color": "#8B5CF6", "polygon": [[767, 788], [767, 791], [769, 794], [769, 796], [770, 797], [771, 797], [773, 799], [773, 800], [783, 810], [788, 812], [793, 816], [795, 816], [796, 817], [800, 817], [800, 802], [801, 801], [801, 796], [800, 795], [800, 793], [799, 792], [799, 791], [796, 788], [795, 788], [794, 787], [792, 787], [791, 786], [778, 786], [777, 787], [768, 787]], "polygons": [[[767, 788], [767, 791], [769, 794], [769, 796], [770, 797], [771, 797], [773, 799], [773, 800], [783, 810], [788, 812], [793, 816], [795, 816], [796, 817], [800, 817], [800, 802], [801, 801], [801, 796], [800, 795], [800, 793], [799, 792], [799, 791], [796, 788], [795, 788], [794, 787], [792, 787], [791, 786], [778, 786], [777, 787], [768, 787]]]}, {"bbox_normalized": [0.743, 0.425, 0.796, 0.467], "bbox_xyxy": [802, 816, 860, 896], "confidence": 0.126, "deleted": true, "id": "sam3_det_005", "label": "dolphin", "mask_area_px": 4640, "mask_color": "#8B5CF6", "polygon": [[802, 816], [803, 824], [807, 832], [810, 835], [814, 843], [819, 848], [828, 864], [840, 878], [848, 891], [853, 896], [856, 896], [857, 888], [855, 876], [860, 864], [859, 860], [850, 856], [831, 836], [818, 828], [807, 818]], "polygons": [[[802, 816], [803, 824], [807, 832], [810, 835], [814, 843], [819, 848], [828, 864], [840, 878], [848, 891], [853, 896], [856, 896], [857, 888], [855, 876], [860, 864], [859, 860], [850, 856], [831, 836], [818, 828], [807, 818]]]}, {"bbox_normalized": [0.719, 0.45, 0.742, 0.479], "bbox_xyxy": [776, 864, 801, 919], "confidence": 0.93, "deleted": false, "id": "user_box_1784790364382", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 1072, "mask_color": "#8B5CF6", "polygon": [[789, 864], [781, 874], [777, 882], [777, 891], [779, 895], [779, 900], [778, 901], [778, 905], [776, 908], [776, 910], [782, 917], [784, 918], [794, 919], [799, 915], [801, 911], [801, 905], [800, 904], [800, 901], [799, 900], [799, 898], [797, 894], [797, 891], [796, 890], [796, 884], [795, 883], [795, 879], [794, 878], [793, 866], [792, 864]], "polygons": [[[789, 864], [781, 874], [777, 882], [777, 891], [779, 895], [779, 900], [778, 901], [778, 905], [776, 908], [776, 910], [782, 917], [784, 918], [794, 919], [799, 915], [801, 911], [801, 905], [800, 904], [800, 901], [799, 900], [799, 898], [797, 894], [797, 891], [796, 890], [796, 884], [795, 883], [795, 879], [794, 878], [793, 866], [792, 864]]]}, {"bbox_normalized": [0.71, 0.409, 0.797, 0.467], "bbox_xyxy": [767, 786, 861, 896], "confidence": 0.953, "deleted": false, "id": "user_box_1784790088723", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 8065, "mask_color": "#8B5CF6", "polygon": [[769, 787], [767, 790], [770, 797], [800, 823], [845, 887], [853, 896], [857, 896], [855, 876], [861, 864], [860, 860], [850, 856], [831, 836], [808, 819], [801, 810], [801, 795], [797, 789], [789, 786]], "polygons": [[[769, 787], [767, 790], [770, 797], [800, 823], [845, 887], [853, 896], [857, 896], [855, 876], [861, 864], [860, 860], [850, 856], [831, 836], [808, 819], [801, 810], [801, 795], [797, 789], [789, 786]]]}, {"bbox_normalized": [0.671, 0.39, 0.701, 0.416], "bbox_xyxy": [725, 748, 757, 798], "confidence": 0.93, "deleted": false, "id": "user_box_1784797821655", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 1248, "mask_color": "#8B5CF6", "polygon": [[727, 748], [725, 750], [726, 751], [726, 756], [729, 760], [730, 765], [732, 768], [732, 770], [735, 775], [735, 777], [737, 780], [737, 782], [740, 788], [742, 790], [743, 793], [747, 797], [749, 798], [754, 798], [756, 796], [756, 794], [757, 793], [757, 789], [756, 788], [755, 783], [738, 760], [734, 750], [732, 748]], "polygons": [[[727, 748], [725, 750], [726, 751], [726, 756], [729, 760], [730, 765], [732, 768], [732, 770], [735, 775], [735, 777], [737, 780], [737, 782], [740, 788], [742, 790], [743, 793], [747, 797], [749, 798], [754, 798], [756, 796], [756, 794], [757, 793], [757, 789], [756, 788], [755, 783], [738, 760], [734, 750], [732, 748]]]}], "frame_index": 2, "height": 1920, "image_url": "assets/8kUHBdHqE2s_frame_00002.jpg", "is_processed": true, "json_filename": "8kUHBdHqE2s_frame_00002_sam3.json", "json_url": "assets/8kUHBdHqE2s_frame_00002_sam3.json", "min_confidence": 0.0, "raw_image_url": "assets/8kUHBdHqE2s_frame_00002.jpg", "target_prompts": ["dolphin"], "thumbnail_url": "assets/thumbs/8kUHBdHqE2s_frame_00002.jpg", "timestamp_sec": 2.0, "verification": {"deleted_detections": ["sam3_det_001", "sam3_det_002", "sam3_det_003", "sam3_det_004", "sam3_det_005"], "json_filename": "8kUHBdHqE2s_frame_00002_verify.json", "status": "modified", "updated_at": "2026-07-25T12:28:17.431344+00:00", "video_id": "8kUHBdHqE2s"}, "video_id": "8kUHBdHqE2s", "width": 1080}], "title": "Dolphin Swim Video (Static)", "video_id": "8kUHBdHqE2s"}], null);
+  }
+  if (window.updateFrameStepperProgress) {
+    window.updateFrameStepperProgress(3, 3, true, 100.0);
+  }
+  
+  
+  
+  
+  
+  if (window.updateSpanProgress) {
+    window.updateSpanProgress(0, 0, false, 0.0);
+  }
+  (function() {
+    const sam3Status = "completed";
+    const sam3Duration = parseFloat("1.2") || 0.0;
+    const resnetStatus = "completed";
+    const resnetDuration = parseFloat("0.5") || 0.0;
+    const yoloStatus = "idle";
+    const yoloProgress = parseInt("0") || 0;
+    const yoloDuration = parseFloat("0.0") || 0.0;
+    const yoloLoadDuration = parseFloat("0.0") || 0.0;
+
+    if (!sessionStorage.getItem('sam3_warmup_toast_state')) {
+      sessionStorage.setItem('sam3_warmup_toast_state', 'not_started');
+    }
+    if (!sessionStorage.getItem('resnet_warmup_toast_state')) {
+      sessionStorage.setItem('resnet_warmup_toast_state', 'not_started');
+    }
+    if (!sessionStorage.getItem('yolo_train_toast_state')) {
+      sessionStorage.setItem('yolo_train_toast_state', 'idle');
+    }
+    if (!sessionStorage.getItem('yolo_train_last_pct')) {
+      sessionStorage.setItem('yolo_train_last_pct', '0');
+    }
+
+    const prevSam3 = sessionStorage.getItem('sam3_warmup_toast_state');
+    const prevResnet = sessionStorage.getItem('resnet_warmup_toast_state');
+    const prevYolo = sessionStorage.getItem('yolo_train_toast_state');
+    const lastPct = parseInt(sessionStorage.getItem('yolo_train_last_pct')) || 0;
+
+    function checkAndToast(modelName, currentStatus, prevStatus, duration, stateKey) {
+      if (currentStatus && currentStatus !== prevStatus) {
+        if (currentStatus === 'warming_up') {
+          if (window.showToast) window.showToast(`⚡ ${modelName} model warming up started...`, 'info');
+          sessionStorage.setItem(stateKey, 'warming_up');
+        } else if (currentStatus === 'completed') {
+          const timeText = duration > 0 ? ` in ${duration.toFixed(1)}s` : '';
+          if (window.showToast) window.showToast(`🟢 ${modelName} model warming up completed${timeText}!`, 'success');
+          sessionStorage.setItem(stateKey, 'completed');
+          if (modelName === 'SAM3') {
+            const readyModal = document.getElementById('modal-sam3-ready');
+            if (readyModal) {
+              readyModal.classList.remove('hidden');
+            }
+            if (window.BoxDrawer && typeof window.BoxDrawer.segmentAllDrawnBoxes === 'function') {
+              window.BoxDrawer.segmentAllDrawnBoxes();
+            }
+          }
+        } else if (currentStatus === 'failed') {
+          if (window.showToast) window.showToast(`🔴 ${modelName} model warming up failed!`, 'error');
+          sessionStorage.setItem(stateKey, 'failed');
+        }
+      }
+    }
+
+    checkAndToast('SAM3', sam3Status, prevSam3, sam3Duration, 'sam3_warmup_toast_state');
+    checkAndToast('ResNet (Crop Detection)', resnetStatus, prevResnet, resnetDuration, 'resnet_warmup_toast_state');
+
+    const badge = document.getElementById("sam3-model-badge");
+    if (badge) {
+      badge.classList.remove("hud-badge--sam3-offline", "hud-badge--sam3-warming", "hud-badge--sam3-online", "hud-badge--sam3-failed");
+      if (sam3Status === "warming_up") {
+        badge.textContent = "SAM3: WARM";
+        badge.classList.add("hud-badge--sam3-warming");
+      } else if (sam3Status === "completed") {
+        badge.textContent = "SAM3: ON";
+        badge.classList.add("hud-badge--sam3-online");
+      } else if (sam3Status === "failed") {
+        badge.textContent = "SAM3: ERR";
+        badge.classList.add("hud-badge--sam3-failed");
+      } else {
+        badge.textContent = "SAM3: OFF";
+        badge.classList.add("hud-badge--sam3-offline");
+      }
+    }
+
+    const resnetBadge = document.getElementById("resnet-model-badge");
+    if (resnetBadge) {
+      resnetBadge.classList.remove("hud-badge--sam3-offline", "hud-badge--sam3-warming", "hud-badge--sam3-online", "hud-badge--sam3-failed");
+      if (resnetStatus === "warming_up") {
+        resnetBadge.textContent = "CROP: WARM";
+        resnetBadge.classList.add("hud-badge--sam3-warming");
+      } else if (resnetStatus === "completed") {
+        resnetBadge.textContent = "CROP: ON";
+        resnetBadge.classList.add("hud-badge--sam3-online");
+      } else if (resnetStatus === "failed") {
+        resnetBadge.textContent = "CROP: ERR";
+        resnetBadge.classList.add("hud-badge--sam3-failed");
+      } else {
+        resnetBadge.textContent = "CROP: OFF";
+        resnetBadge.classList.add("hud-badge--sam3-offline");
+      }
+    }
+
+    const startBtn = document.getElementById("btn-start-sam3");
+    if (startBtn) {
+      if (sam3Status === "warming_up" || sam3Status === "completed") {
+        startBtn.classList.add("hidden");
+      } else {
+        startBtn.classList.remove("hidden");
+      }
+    }
+
+    // Handle YOLO training status toasts
+    if (yoloStatus && yoloStatus !== prevYolo) {
+      if (yoloStatus === 'training_started') {
+        if (window.showToast) window.showToast('⚡ YOLO Classifier training started...', 'info');
+        sessionStorage.setItem('yolo_train_toast_state', 'training_started');
+        sessionStorage.setItem('yolo_train_last_pct', '0');
+      } else if (yoloStatus === 'training_completed') {
+        const loadText = yoloLoadDuration > 0 ? ` (base model load: ${yoloLoadDuration.toFixed(1)}s)` : '';
+        if (window.showToast) window.showToast(`🟢 YOLO Classifier training finished successfully in ${yoloDuration.toFixed(1)}s${loadText}!`, 'success');
+        sessionStorage.setItem('yolo_train_toast_state', 'training_completed');
+      } else if (yoloStatus === 'training_failed') {
+        if (window.showToast) window.showToast(`🔴 YOLO Classifier training failed after ${yoloDuration.toFixed(1)}s!`, 'error');
+        sessionStorage.setItem('yolo_train_toast_state', 'training_failed');
+      }
+    }
+
+    if (yoloStatus.startsWith('training_progress_')) {
+      const currentPct = parseInt(yoloStatus.split('_')[2]) || 0;
+      if (currentPct > lastPct) {
+        if (window.showToast) window.showToast(`⏳ YOLO Classifier training: ${currentPct}% completed`, 'info');
+        sessionStorage.setItem('yolo_train_last_pct', currentPct.toString());
+        sessionStorage.setItem('yolo_train_toast_state', yoloStatus);
+      }
+    }
+  })();
+</script>
+    </div>
+
+    <!-- Bottom Shortcut Helper Bar -->
+    <div class="hud-bottombar">
+      <!-- 1. Navigate -->
+      <div class="hud-btn-group" title="Navigate Frames [A/D, ←/→, ↑/↓]">
+        <button id="btn-bottom-nav-prev" class="hud-btn--shortcut-action" title="Previous Frame [← / ↑ / A]">‹</button>
+        <button id="btn-bottom-nav-next" class="hud-btn--shortcut-action" title="Next Frame [→ / ↓ / D]">›</button>
+        <span class="hud-btn-group-label" style="display:inline-flex; align-items:center; gap:4px;">
+          <kbd>←/→</kbd>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/></svg>
+        </span>
+      </div>
+
+      <!-- 2. Propagate -->
+      <div class="hud-btn-group" title="Propagate SAM3 BBoxes sequentially">
+        <button id="btn-bottom-propagate-prev" class="hud-btn--shortcut-action" title="Propagate Previous [Ctrl + ←]">◀</button>
+        <button id="btn-bottom-propagate-next" class="hud-btn--shortcut-action" title="Propagate Next [Ctrl + →]">▶</button>
+        <span class="hud-btn-group-label" style="display:inline-flex; align-items:center; gap:4px;">
+          <kbd>Ctrl</kbd>+<kbd>←/→</kbd>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M2.5 16l1.2 1.2A10 10 0 0 0 22 12.5"/></svg>
+        </span>
+      </div>
+
+      <!-- 3. S Select -->
+      <button id="btn-bottom-select" class="hud-btn hud-btn--shortcut" title="Select / Inspect Mode [S]">
+        <kbd>S</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+      </button>
+
+      <!-- 4. B Draw Box -->
+      <button id="btn-bottom-draw" class="hud-btn hud-btn--shortcut" title="Draw Box Prompt Mode [B]">
+        <kbd>B</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/><path d="M12 8v8M8 12h8"/></svg>
+      </button>
+
+      <!-- 5. C Crop & Train -->
+      <button id="btn-bottom-crop" class="hud-btn hud-btn--shortcut" title="Crop Selected Bounding Boxes & Add to Dataset [C]">
+        <kbd>C</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="9.8" y1="8.2" x2="22" y2="20"/><line x1="9.8" y1="15.8" x2="22" y2="4"/></svg>
+      </button>
+
+      <!-- 9. R Run SAM3 -->
+      <button id="btn-bottom-run-sam3" class="hud-btn hud-btn--shortcut hud-btn--accent" title="Trigger SAM3 Detection on Current Video [R]">
+        <kbd>R</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </button>
+
+      <!-- 10. M Toggle Masks -->
+      <button id="btn-bottom-toggle-masks" class="hud-btn hud-btn--shortcut" title="Toggle SAM3 Overlay [M]">
+        <kbd>M</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+
+      <!-- 11. Z Zen Mode -->
+      <button id="btn-bottom-toggle-zen" class="hud-btn hud-btn--shortcut" title="Toggle Clean View / Zen Mode [Z]">
+        <kbd>Z</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+
+      <!-- 12. Shift+W Fit Image -->
+      <button id="btn-bottom-fit-image" class="hud-btn hud-btn--shortcut" title="Toggle Fit Canvas Between Side Widgets [Shift+W]">
+        <kbd>⇧</kbd><kbd>W</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/></svg>
+      </button>
+
+      <!-- 13. J JSON -->
+      <button id="btn-bottom-json" class="hud-btn hud-btn--shortcut" title="View JSON Metadata [J]">
+        <kbd>J</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </button>
+
+      <!-- 14. ? Help -->
+      <button id="btn-bottom-help" class="hud-btn hud-btn--shortcut" title="Keyboard Shortcuts Help [?]">
+        <kbd>?</kbd>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:inline-block; vertical-align:middle; margin-left:2px;"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </button>
+    </div>
+
+    <!-- JSON Metadata Modal -->
+    <div id="modal-json" class="hud-modal hidden">
+      <div class="hud-modal__content">
+        <div class="hud-modal__header">
+          <h3>Frame JSON Metadata</h3>
+          <button class="hud-modal__close" onclick="closeJsonModal()">×</button>
+        </div>
+        <pre id="json-modal-body" class="hud-modal__body"></pre>
+      </div>
+    </div>
+
+    <!-- Label Picker Modal -->
+    <div id="modal-label-picker" class="hud-modal hidden">
+      <div class="hud-modal__content" style="max-width:440px;">
+        <div class="hud-modal__header">
+          <h3>🏷️ Select or Add Object Label</h3>
+          <button class="hud-modal__close" onclick="document.getElementById('modal-label-picker').classList.add('hidden')">×</button>
+        </div>
+        <div class="hud-modal__body" style="padding:16px;">
+          <p style="font-size:12px; color:#94a3b8; margin:0 0 10px 0;">Click an existing label from the dataset, or enter a new label below:</p>
+          <div id="label-picker-chips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; min-height:28px;"></div>
+          <div style="display:flex; gap:6px;">
+            <input type="text" id="label-picker-custom-input" class="sidesheet-input" placeholder="e.g. helmet, vest..." style="flex:1; font-size:13px;" />
+            <button id="label-picker-confirm-btn" class="hud-btn hud-btn--accent" style="padding:6px 14px; white-space:nowrap;">Apply Label</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dataset Sample Images Viewer Modal -->
+    <div id="modal-dataset-viewer" class="hud-modal hidden">
+      <div class="hud-modal__content" style="max-width:90%; width:1000px; max-height:85vh; display:flex; flex-direction:column; padding: 20px; background:#0f172a; border:1px solid #334155; border-radius:12px; color:#f8fafc;">
+        <div class="hud-modal__header" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:12px;">
+          <h3 class="hud-modal__title" style="margin:0; font-size:18px; display:flex; align-items:center; gap:8px;">🖼️ Dataset Sample Images</h3>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button id="btn-dataset-train" class="hud-btn" style="background:#8b5cf6; color:white; border:none; padding:6px 14px; border-radius:6px; font-weight:600; cursor:pointer;" onclick="window.DatasetViewer && window.DatasetViewer.trainDataset()">
+              ⚡ Train Classifier
+            </button>
+            <button id="btn-dataset-delete-selected" class="hud-btn" style="background:#ef4444; color:white; border:none; padding:6px 14px; border-radius:6px; font-weight:600; cursor:pointer; display:none;" onclick="window.DatasetViewer && window.DatasetViewer.deleteSelected()">
+              🗑 Delete Selected (<span id="dataset-selected-count">0</span>)
+            </button>
+            <button class="hud-modal__close" onclick="window.DatasetViewer && window.DatasetViewer.close()" style="font-size:24px; background:none; border:none; color:#94a3b8; cursor:pointer; padding:0 8px; line-height:1;">&times;</button>
+          </div>
+        </div>
+        <!-- Training Progress Stepper -->
+        <div id="dataset-viewer-stepper-container" class="hidden" style="margin-bottom: 16px; padding: 12px 16px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span id="dataset-stepper-status" style="font-size: 13px; color: #a78bfa; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <span class="spinner-mini" style="border: 2px solid #a78bfa; border-top-color: transparent; border-radius: 50%; width: 12px; height: 12px; display: inline-block; animation: spin 1s linear infinite;"></span>
+              <span>Training YOLO Classifier...</span>
+            </span>
+            <span id="dataset-stepper-percent-text" style="font-size: 12px; color: #94a3b8; font-weight: 500;">0%</span>
+          </div>
+          <div id="dataset-viewer-stepper" style="display: flex; align-items: center; justify-content: space-between; position: relative; margin-top: 10px; padding: 0 4px;">
+            <!-- Horizontal track line behind steps -->
+            <div style="position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: #334155; transform: translateY(-50%); z-index: 1;"></div>
+            <div id="dataset-stepper-progress-line" style="position: absolute; top: 50%; left: 0; width: 0%; height: 2px; background: #8b5cf6; transform: translateY(-50%); z-index: 2; transition: width 0.3s ease;"></div>
+            
+            <!-- Step nodes -->
+            <div class="stepper-step" data-percent="0" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">0</div>
+            <div class="stepper-step" data-percent="10" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">10</div>
+            <div class="stepper-step" data-percent="20" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">20</div>
+            <div class="stepper-step" data-percent="30" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">30</div>
+            <div class="stepper-step" data-percent="40" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">40</div>
+            <div class="stepper-step" data-percent="50" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">50</div>
+            <div class="stepper-step" data-percent="60" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">60</div>
+            <div class="stepper-step" data-percent="70" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">70</div>
+            <div class="stepper-step" data-percent="80" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">80</div>
+            <div class="stepper-step" data-percent="90" style="width: 22px; height: 22px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">90</div>
+            <div class="stepper-step" data-percent="100" style="width: 26px; height: 26px; border-radius: 50%; background: #0f172a; border: 2px solid #334155; z-index: 3; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; transition: all 0.3s ease;">100</div>
+          </div>
+          <pre id="dataset-stepper-logs-console" style="margin-top: 15px; height: 120px; overflow-y: auto; background: #020617; border: 1px solid #334155; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; color: #38bdf8; text-align: left; white-space: pre-wrap; word-break: break-all; box-sizing: border-box;"></pre>
+        </div>
+        
+        <!-- Category Filter Tabs -->
+        <div id="dataset-viewer-tabs" style="display:flex; gap:8px; border-bottom:1px solid #334155; padding-bottom:8px; margin-bottom:12px; overflow-x:auto;">
+          <!-- Populated by label tabs -->
+        </div>
+
+        <div id="dataset-viewer-grid" style="flex:1; overflow-y:auto; display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start; justify-content:flex-start; padding:4px;">
+          <!-- Populated by crop image cards -->
+        </div>
+        
+        <div id="dataset-viewer-empty" class="hidden" style="text-align:center; padding:40px; color:#64748b; font-size:14px;">
+          No crops found for this category.
+        </div>
+
+        <!-- Pagination Controls Footer -->
+        <div id="dataset-viewer-pagination" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #334155; padding-top:12px; margin-top:12px;">
+          <button id="btn-dataset-prev" class="hud-btn" style="padding:4px 12px; font-size:12px;" onclick="window.DatasetViewer && window.DatasetViewer.prevPage()">
+            &lsaquo; Prev
+          </button>
+          <span id="dataset-page-info" style="font-size:13px; color:#94a3b8;">
+            Page 1 of 1 (0 total crops)
+          </span>
+          <button id="btn-dataset-next" class="hud-btn" style="padding:4px 12px; font-size:12px;" onclick="window.DatasetViewer && window.DatasetViewer.nextPage()">
+            Next &rsaquo;
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- YOLO Training Confirmation Modal -->
+    <div id="modal-train-confirm" class="hud-modal hidden" style="z-index: 10002;">
+      <div class="hud-modal__content" style="max-width:400px; width:100%; display:flex; flex-direction:column; padding:20px; background:#0f172a; border:1px solid #334155; border-radius:12px; color:#f8fafc; text-align:center;">
+        <div style="font-size:36px; margin-bottom:10px;">⚡</div>
+        <h4 style="margin:0 0 8px 0; font-size:16px; color:#a78bfa; font-weight:600;">Train YOLO Classifier</h4>
+        <p style="font-size:13px; color:#94a3b8; margin:0; line-height:1.5;">Start training the YOLO classifier on the current crops dataset? This runs asynchronously in the background.</p>
+        <div style="margin: 15px 0; text-align: left;">
+          <label style="display:block; font-size:11px; color:#94a3b8; margin-bottom:6px; font-weight:500;">Training Epochs:</label>
+          <input type="number" id="train-confirm-epochs" value="10" min="1" max="100" style="width:100%; box-sizing:border-box; background:#1e293b; border:1px solid #334155; padding:6px 10px; border-radius:6px; color:#f8fafc; font-size:13px;" />
+          <div id="train-confirm-epochs-est" style="font-size:11px; color:#38bdf8; margin-top:6px; font-weight:500;">Estimated duration: ~2.0 mins (based on ~12s/epoch)</div>
+        </div>
+        <div style="display:flex; justify-content:center; gap:10px;">
+          <button id="btn-train-confirm-yes" class="hud-btn hud-btn--accent" style="background:#8b5cf6; border:1px solid #7c3aed; color:white; padding:6px 16px; border-radius:6px; font-weight:600; cursor:pointer;">
+            Start Training
+          </button>
+          <button id="btn-train-confirm-no" class="hud-btn" style="background:#1e293b; border:1px solid #334155; color:#94a3b8; padding:6px 16px; border-radius:6px; font-weight:600; cursor:pointer;">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SAM3 Ready Notification Modal -->
+    <div id="modal-sam3-ready" class="hud-modal hidden" style="z-index: 10005;">
+      <div class="hud-modal__content" style="max-width:380px; width:100%; display:flex; flex-direction:column; padding:24px; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border:1px solid rgba(255, 255, 255, 0.15); border-radius:16px; color:#f8fafc; text-align:center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4); animation: modalFadeIn 0.3s ease-out;">
+        <div style="font-size:42px; margin-bottom:12px; filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.5));">🚀</div>
+        <h4 style="margin:0 0 8px 0; font-size:18px; color:#60a5fa; font-weight:700; letter-spacing: 0.5px;">SAM3 Service Ready!</h4>
+        <p style="font-size:13px; color:#cbd5e1; margin:0 0 20px 0; line-height:1.5;">The SAM3 segmenter has warmed up successfully and zero-shot object detection is now online.</p>
+        <div style="display:flex; justify-content:center;">
+          <button onclick="document.getElementById('modal-sam3-ready').classList.add('hidden')" class="hud-btn" style="background:#3b82f6; border:1px solid #2563eb; color:white; padding:8px 24px; border-radius:8px; font-weight:600; cursor:pointer; font-size: 13px; transition: all 0.2s ease; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);">
+            Great, Let's Go!
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bounding Box Classification Modal -->
+    <div id="modal-classification-result" class="hud-modal hidden">
+      <div class="hud-modal__content" style="max-width:480px; width:100%; display:flex; flex-direction:column; padding:20px; background:#0f172a; border:1px solid #334155; border-radius:12px; color:#f8fafc;">
+        <div class="hud-modal__header" style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #334155; padding-bottom:12px; margin-bottom:12px;">
+          <h3 class="hud-modal__title" style="margin:0; font-size:18px; display:flex; align-items:center; gap:8px;">🔍 Re-Classify Bounding Box</h3>
+          <button class="hud-modal__close" onclick="document.getElementById('modal-classification-result').classList.add('hidden')" style="font-size:24px; background:none; border:none; color:#94a3b8; cursor:pointer; padding:0 8px; line-height:1;">&times;</button>
+        </div>
+        
+        <div class="hud-modal__body" style="padding: 10px 0;">
+          <!-- Loading State -->
+          <div id="classification-loading" class="hidden" style="text-align:center; padding:30px; color:#94a3b8;">
+            <div class="spinner" style="margin:0 auto 10px auto; width:30px; height:30px; border:3px solid rgba(56,189,248,0.1); border-top-color:#38bdf8; border-radius:50%; animation:spin 1s linear infinite;"></div>
+            <span>Running YOLO classifier prediction...</span>
+          </div>
+
+          <!-- Untrained Model Friendly State -->
+          <div id="classification-untrained" class="hidden" style="text-align:center; padding:20px; color:#f8fafc;">
+            <div style="font-size:40px; margin-bottom:12px;">⚠️</div>
+            <h4 style="margin:0 0 8px 0; font-size:16px; color:#f87171;">Classifier Model Not Trained</h4>
+            <p style="font-size:13px; color:#94a3b8; margin:0; line-height:1.5;">A trained YOLO classifier model does not exist yet. Would you like to initiate training now using cropped boxes with >=90% confidence?</p>
+            <div style="margin: 15px 0; text-align: left;">
+              <label style="display:block; font-size:11px; color:#94a3b8; margin-bottom:6px; font-weight:500;">Training Epochs:</label>
+              <input type="number" id="classification-untrained-epochs" value="10" min="1" max="100" style="width:100%; box-sizing:border-box; background:#1e293b; border:1px solid #334155; padding:6px 10px; border-radius:6px; color:#f8fafc; font-size:13px;" />
+              <div id="classification-untrained-epochs-est" style="font-size:11px; color:#38bdf8; margin-top:6px; font-weight:500;">Estimated duration: ~2.0 mins (based on ~12s/epoch)</div>
+            </div>
+            <div style="display:flex; justify-content:center; gap:10px; margin-top:16px;">
+              <button id="btn-initiate-training" class="hud-btn hud-btn--accent" style="background:#10b981; border:1px solid #059669;" onclick="window.ViewerApp.initiateClassifierTraining()">
+                ⚡ Yes, Initiate Training
+              </button>
+              <button class="hud-btn" onclick="document.getElementById('modal-classification-result').classList.add('hidden')">
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <!-- Training State -->
+          <div id="classification-training" class="hidden" style="text-align:center; padding:25px; color:#f8fafc;">
+            <div class="spinner" style="margin:0 auto 15px auto; width:35px; height:35px; border:3px solid rgba(16,185,129,0.1); border-top-color:#10b981; border-radius:50%; animation:spin 1s linear infinite;"></div>
+            <h4 id="classification-training-step" style="margin:0 0 8px 0; font-size:15px; color:#34d399; font-weight:600;">Harvesting annotated crop samples...</h4>
+            <div style="background:#0f172a; height:10px; border-radius:5px; overflow:hidden; margin:14px 0; border:1px solid #334155; position:relative;">
+              <div id="classification-training-progress-bar" style="background:#10b981; height:100%; width:0%; transition: width 0.2s ease;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:#94a3b8;">
+              <span id="classification-training-percent">0%</span>
+              <span id="classification-training-status">Preparing...</span>
+            </div>
+            <pre id="classification-training-logs-console" style="margin-top: 15px; height: 120px; overflow-y: auto; background: #020617; border: 1px solid #334155; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; color: #38bdf8; text-align: left; white-space: pre-wrap; word-break: break-all; box-sizing: border-box;"></pre>
+          </div>
+
+          <!-- Results Container -->
+          <div id="classification-results" class="hidden">
+            <div style="display:flex; gap:16px; align-items:center; margin-bottom:16px; background:#1e293b; padding:12px; border-radius:8px; border:1px solid #334155;">
+              <div style="width:100px; height:100px; display:flex; align-items:center; justify-content:center; background:#020617; border-radius:6px; overflow:hidden; border:1px solid #475569; flex-shrink:0;">
+                <img id="classification-crop-img" src="" alt="Cropped area" style="max-width:100%; max-height:100%; object-fit:contain;" />
+              </div>
+              <div style="flex:1;">
+                <span style="font-size:11px; text-transform:uppercase; color:#94a3b8; font-weight:600; letter-spacing:0.05em;">Most Likely Label</span>
+                <h4 id="classification-top-label" style="margin:2px 0 6px 0; font-size:22px; color:#38bdf8; font-weight:700;">-</h4>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <div style="flex:1; background:#0f172a; height:8px; border-radius:4px; overflow:hidden;">
+                    <div id="classification-top-bar" style="background:#38bdf8; height:100%; width:0%;"></div>
+                  </div>
+                  <span id="classification-top-conf" style="font-size:12px; font-weight:600; color:#f8fafc; min-width:36px; text-align:right;">0%</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-bottom:8px;">
+              <span style="font-size:11px; text-transform:uppercase; color:#94a3b8; font-weight:600; letter-spacing:0.05em;">All Labels Confidence Levels</span>
+            </div>
+            <div id="classification-bars-list" style="display:flex; flex-direction:column; gap:10px; max-height:180px; overflow-y:auto; padding-right:4px;">
+              <!-- Dynamic class confidence bars -->
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-modal__footer" style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid #334155; padding-top:12px; margin-top:12px;">
+          <button id="btn-classification-confirm" class="hud-btn hud-btn--accent hidden">Confirm Label</button>
+          <button id="btn-classification-close" class="hud-btn" onclick="document.getElementById('modal-classification-result').classList.add('hidden')">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Screen Completed Overlay -->
+    <div id="classifier-training-complete-overlay" class="hidden" 
+         style="position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:99999; background:rgba(16,185,129,0.95); color:white; padding:20px 40px; border-radius:12px; font-size:24px; font-weight:bold; cursor:pointer; box-shadow:0 10px 25px rgba(0,0,0,0.5); text-align:center; border: 2px solid #059669; backdrop-filter: blur(4px); transition: opacity 0.3s;"
+         onclick="this.classList.add('hidden')">
+      Completed!
+    </div>
+
+    <style>
+    .dataset-tab {
+      padding: 6px 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .dataset-tab:hover {
+      background: #334155;
+      color: #f8fafc;
+    }
+    .dataset-tab.active {
+      background: rgba(139, 92, 246, 0.15);
+      border-color: #8b5cf6;
+      color: #c084fc;
+    }
+    .crop-card {
+      position: relative;
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      user-select: none;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.2s ease;
+      width: 96px;
+    }
+    .crop-card:hover {
+      border-color: #475569;
+    }
+    .crop-card.selected {
+      border-color: #8b5cf6;
+      background: rgba(139, 92, 246, 0.05);
+    }
+    .crop-card-img-wrapper {
+      position: relative;
+      background: #020617;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      width: 80px;
+      height: 80px;
+    }
+    .crop-card-img {
+      display: block;
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+    }
+    .crop-card-checkbox {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 2px solid #64748b;
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+    .crop-card.selected .crop-card-checkbox {
+      background: #8b5cf6;
+      border-color: #8b5cf6;
+    }
+    .crop-card.selected .crop-card-checkbox::after {
+      content: "✓";
+      color: white;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .crop-card-meta {
+      padding: 4px 8px;
+      font-size: 10px;
+      color: #94a3b8;
+      text-align: center;
+      max-width: 96px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+      border-top: 1px solid #334155;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    </style>
+
+    <!-- Hotkey Help Cheat-Sheet Modal -->
+<div id="modal-help" class="hud-modal hidden">
+  <div class="hud-modal__content hud-modal__content--help">
+    <div class="hud-modal__header">
+      <h3>Keyboard Shortcuts Cheat-Sheet</h3>
+      <button class="hud-modal__close" onclick="closeHelpModal()">×</button>
+    </div>
+    <div class="hud-modal__body">
+      <table class="shortcuts-table">
+        <thead>
+          <tr><th>Key</th><th>Action</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>→</kbd> / <kbd>↓</kbd> / <kbd>D</kbd></td><td>Next Frame</td><td>Advance to next keyframe (+1)</td></tr>
+          <tr><td><kbd>←</kbd> / <kbd>↑</kbd> / <kbd>A</kbd></td><td>Previous Frame</td><td>Return to previous keyframe (-1)</td></tr>
+          <tr><td><kbd>Shift+→</kbd> / <kbd>Shift+←</kbd></td><td>Flip Video Page</td><td>Advance / previous page in current video group</td></tr>
+          <tr><td><kbd>Ctrl+←</kbd> / <kbd>Ctrl+→</kbd></td><td>Propagate BBoxes</td><td>Propagate active bboxes to Prev / Next frame(s) with SAM3</td></tr>
+          <tr><td><kbd>PgDn</kbd> / <kbd>PgUp</kbd></td><td>Jump ±10 Frames</td><td>Fast forward (+10) / rewind (-10) frames</td></tr>
+          <tr><td><kbd>S</kbd> / <kbd>B</kbd></td><td>Mode Switch</td><td>Switch Select mode [S] / Draw Box mode [B]</td></tr>
+          <tr><td><kbd>G</kbd> / <kbd>Shift+G</kbd></td><td>Segment Box</td><td>Segment selected box [G] / Segment all boxes [Shift+G]</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Slideshow</td><td>Toggle auto-advance slideshow</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Run SAM3</td><td>Trigger SAM3 detection pipeline</td></tr>
+          <tr><td><kbd>M</kbd></td><td>Toggle Masks</td><td>Show / hide mask & box overlay</td></tr>
+          <tr><td><kbd>Shift+W</kbd></td><td>Fit Between Widgets</td><td>Toggle fit canvas between side drawers / edge-to-edge</td></tr>
+          <tr><td><kbd>Z</kbd></td><td>Zen Mode</td><td>Toggle show/hide all HUD widgets (Clean Fullscreen View)</td></tr>
+          <tr><td><kbd>J</kbd></td><td>View JSON</td><td>Open raw JSON metadata modal</td></tr>
+          <tr><td><kbd>?</kbd> or <kbd>H</kbd></td><td>Help HUD</td><td>Toggle this keyboard shortcut helper</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close</td><td>Close active overlay / modal</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+  </div>
+
+  <script>
+    window.WORKSPACE_DATA = [{"frames": [{"detections": [{"bbox_normalized": [0.734, 0.407, 0.81, 0.458], "bbox_xyxy": [793, 781, 875, 879], "confidence": 0.953, "deleted": false, "id": "user_box_1784790088723", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 6268, "mask_color": "#8B5CF6", "polygon": [[793, 783], [794, 792], [826, 823], [851, 861], [868, 878], [872, 879], [873, 861], [875, 856], [874, 848], [850, 832], [827, 805], [818, 784], [811, 781]], "polygons": [[[793, 783], [794, 792], [826, 823], [851, 861], [868, 878], [872, 879], [873, 861], [875, 856], [874, 848], [850, 832], [827, 805], [818, 784], [811, 781]]]}, {"bbox_normalized": [0.748, 0.45, 0.768, 0.481], "bbox_xyxy": [808, 864, 829, 924], "confidence": 0.883, "deleted": false, "id": "user_box_1784792260041", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 982, "mask_color": "#8B5CF6", "polygon": [[819, 864], [815, 867], [813, 872], [809, 876], [809, 879], [808, 880], [809, 916], [820, 924], [823, 924], [828, 920], [828, 918], [829, 917], [829, 903], [828, 902], [828, 898], [827, 897], [827, 894], [825, 889], [825, 885], [824, 884], [824, 882], [822, 878], [822, 875], [821, 874], [821, 868]], "polygons": [[[819, 864], [815, 867], [813, 872], [809, 876], [809, 879], [808, 880], [809, 916], [820, 924], [823, 924], [828, 920], [828, 918], [829, 917], [829, 903], [828, 902], [828, 898], [827, 897], [827, 894], [825, 889], [825, 885], [824, 884], [824, 882], [822, 878], [822, 875], [821, 874], [821, 868]]]}, {"bbox_normalized": [0.667, 0.38, 0.719, 0.412], "bbox_xyxy": [720, 729, 777, 792], "confidence": 0.914, "deleted": false, "id": "user_box_1784894230989", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 2800, "mask_color": "#8B5CF6", "polygon": [[725, 729], [720, 736], [723, 749], [726, 753], [729, 764], [733, 772], [746, 783], [752, 785], [760, 791], [774, 792], [776, 790], [777, 783], [775, 776], [770, 769], [752, 750], [745, 738], [740, 733], [733, 729]], "polygons": [[[725, 729], [720, 736], [723, 749], [726, 753], [729, 764], [733, 772], [746, 783], [752, 785], [760, 791], [774, 792], [776, 790], [777, 783], [775, 776], [770, 769], [752, 750], [745, 738], [740, 733], [733, 729]]]}], "frame_index": 0, "height": 1920, "image_url": "assets/8kUHBdHqE2s_frame_00000.jpg", "is_processed": true, "json_filename": "8kUHBdHqE2s_frame_00000_sam3.json", "json_url": "assets/8kUHBdHqE2s_frame_00000_sam3.json", "min_confidence": 0.0, "raw_image_url": "assets/8kUHBdHqE2s_frame_00000.jpg", "target_prompts": ["dolphin"], "thumbnail_url": "assets/thumbs/8kUHBdHqE2s_frame_00000.jpg", "timestamp_sec": 0.0, "verification": {"deleted_detections": ["user_box_1784770934569", "user_box_1784771077779", "user_box_1784780161318"], "json_filename": "8kUHBdHqE2s_frame_00000_verify.json", "status": "modified", "updated_at": "2026-07-23T04:26:47.334020+00:00", "video_id": "8kUHBdHqE2s"}, "video_id": "8kUHBdHqE2s", "width": 1080}, {"detections": [{"bbox_normalized": [0.723, 0.409, 0.803, 0.463], "bbox_xyxy": [781, 785, 867, 889], "confidence": 0.123, "deleted": true, "id": "sam3_det_001", "label": "dolphin", "mask_area_px": 8944, "mask_color": "#8B5CF6", "polygon": [[781, 789], [784, 796], [803, 812], [812, 822], [835, 857], [852, 876], [856, 885], [860, 889], [863, 889], [864, 870], [867, 856], [861, 853], [843, 835], [837, 832], [822, 818], [812, 803], [811, 795], [807, 787], [795, 785], [789, 788]], "polygons": [[[781, 789], [784, 796], [803, 812], [812, 822], [835, 857], [852, 876], [856, 885], [860, 889], [863, 889], [864, 870], [867, 856], [861, 853], [843, 835], [837, 832], [822, 818], [812, 803], [811, 795], [807, 787], [795, 785], [789, 788]]]}, {"bbox_normalized": [0.668, 0.379, 0.717, 0.414], "bbox_xyxy": [721, 728, 774, 795], "confidence": 0.891, "deleted": false, "id": "user_box_1784790064634", "is_propagated": true, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 2769, "mask_color": "#8B5CF6", "polygon": [[725, 730], [721, 735], [722, 744], [727, 753], [738, 767], [740, 772], [750, 787], [754, 791], [761, 795], [766, 795], [770, 792], [772, 792], [774, 790], [774, 783], [763, 774], [758, 767], [748, 758], [738, 742], [733, 729], [729, 728]], "polygons": [[[725, 730], [721, 735], [722, 744], [727, 753], [738, 767], [740, 772], [750, 787], [754, 791], [761, 795], [766, 795], [770, 792], [772, 792], [774, 790], [774, 783], [763, 774], [758, 767], [748, 758], [738, 742], [733, 729], [729, 728]]]}, {"bbox_normalized": [0.734, 0.45, 0.756, 0.479], "bbox_xyxy": [793, 864, 816, 920], "confidence": 0.91, "deleted": false, "id": "user_box_1784790345486", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 1004, "mask_color": "#8B5CF6", "polygon": [[804, 864], [804, 865], [800, 869], [799, 872], [797, 874], [794, 881], [794, 885], [793, 886], [793, 892], [794, 893], [793, 912], [794, 913], [794, 915], [797, 918], [799, 918], [800, 919], [806, 919], [808, 920], [815, 917], [815, 915], [816, 914], [816, 909], [815, 908], [815, 905], [814, 904], [814, 902], [812, 898], [812, 895], [811, 894], [811, 889], [810, 888], [810, 884], [809, 883], [808, 875], [807, 874], [807, 868]], "polygons": [[[804, 864], [804, 865], [800, 869], [799, 872], [797, 874], [794, 881], [794, 885], [793, 886], [793, 892], [794, 893], [793, 912], [794, 913], [794, 915], [797, 918], [799, 918], [800, 919], [806, 919], [808, 920], [815, 917], [815, 915], [816, 914], [816, 909], [815, 908], [815, 905], [814, 904], [814, 902], [812, 898], [812, 895], [811, 894], [811, 889], [810, 888], [810, 884], [809, 883], [808, 875], [807, 874], [807, 868]]]}, {"bbox_normalized": [0.721, 0.408, 0.805, 0.464], "bbox_xyxy": [779, 784, 869, 891], "confidence": 0.945, "deleted": false, "id": "user_box_1784797148511", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 7511, "mask_color": "#8B5CF6", "polygon": [[781, 786], [779, 788], [781, 794], [812, 823], [820, 838], [836, 860], [849, 873], [856, 886], [860, 890], [864, 891], [865, 868], [869, 856], [860, 852], [818, 813], [813, 805], [810, 791], [806, 786], [800, 784], [789, 787]], "polygons": [[[781, 786], [779, 788], [781, 794], [812, 823], [820, 838], [836, 860], [849, 873], [856, 886], [860, 890], [864, 891], [865, 868], [869, 856], [860, 852], [818, 813], [813, 805], [810, 791], [806, 786], [800, 784], [789, 787]]]}], "frame_index": 1, "height": 1920, "image_url": "assets/8kUHBdHqE2s_frame_00001.jpg", "is_processed": true, "json_filename": "8kUHBdHqE2s_frame_00001_sam3.json", "json_url": "assets/8kUHBdHqE2s_frame_00001_sam3.json", "min_confidence": 0.0, "raw_image_url": "assets/8kUHBdHqE2s_frame_00001.jpg", "target_prompts": ["dolphin"], "thumbnail_url": "assets/thumbs/8kUHBdHqE2s_frame_00001.jpg", "timestamp_sec": 1.0, "verification": {"deleted_detections": ["sam3_det_001"], "json_filename": "8kUHBdHqE2s_frame_00001_verify.json", "status": "modified", "updated_at": "2026-07-25T12:19:37.643018+00:00", "video_id": "8kUHBdHqE2s"}, "video_id": "8kUHBdHqE2s", "width": 1080}, {"detections": [{"bbox_normalized": [0.677, 0.392, 0.7, 0.416], "bbox_xyxy": [731, 753, 756, 798], "confidence": 0.136, "deleted": true, "id": "sam3_det_001", "label": "dolphin", "mask_area_px": 1125, "mask_color": "#8B5CF6", "polygon": [[732, 753], [731, 754], [731, 764], [732, 765], [733, 770], [735, 773], [736, 778], [738, 781], [738, 783], [741, 789], [743, 791], [743, 792], [748, 797], [750, 797], [752, 798], [756, 795], [756, 787], [755, 786], [755, 784], [753, 780], [750, 777], [749, 774], [740, 764], [737, 757], [733, 753]], "polygons": [[[732, 753], [731, 754], [731, 764], [732, 765], [733, 770], [735, 773], [736, 778], [738, 781], [738, 783], [741, 789], [743, 791], [743, 792], [748, 797], [750, 797], [752, 798], [756, 795], [756, 787], [755, 786], [755, 784], [753, 780], [750, 777], [749, 774], [740, 764], [737, 757], [733, 753]]]}, {"bbox_normalized": [0.71, 0.409, 0.796, 0.467], "bbox_xyxy": [767, 786, 860, 896], "confidence": 0.157, "deleted": true, "id": "sam3_det_002", "label": "dolphin", "mask_area_px": 10230, "mask_color": "#8B5CF6", "polygon": [[769, 787], [767, 789], [769, 796], [775, 803], [801, 824], [829, 866], [840, 878], [846, 888], [856, 896], [857, 889], [855, 876], [860, 862], [848, 855], [830, 835], [818, 828], [803, 813], [801, 809], [801, 796], [797, 789], [788, 786]], "polygons": [[[769, 787], [767, 789], [769, 796], [775, 803], [801, 824], [829, 866], [840, 878], [846, 888], [856, 896], [857, 889], [855, 876], [860, 862], [848, 855], [830, 835], [818, 828], [803, 813], [801, 809], [801, 796], [797, 789], [788, 786]]]}, {"bbox_normalized": [0.72, 0.45, 0.741, 0.481], "bbox_xyxy": [778, 864, 800, 924], "confidence": 0.129, "deleted": true, "id": "sam3_det_003", "label": "dolphin", "mask_area_px": 1320, "mask_color": "#8B5CF6", "polygon": [[791, 864], [789, 864], [781, 875], [780, 879], [778, 882], [778, 890], [780, 895], [780, 903], [778, 908], [778, 917], [780, 921], [784, 924], [792, 924], [797, 919], [800, 911], [800, 903], [798, 899], [797, 891], [796, 890], [796, 884], [794, 879], [793, 867]], "polygons": [[[791, 864], [789, 864], [781, 875], [780, 879], [778, 882], [778, 890], [780, 895], [780, 903], [778, 908], [778, 917], [780, 921], [784, 924], [792, 924], [797, 919], [800, 911], [800, 903], [798, 899], [797, 891], [796, 890], [796, 884], [794, 879], [793, 867]]]}, {"bbox_normalized": [0.71, 0.409, 0.742, 0.426], "bbox_xyxy": [767, 786, 801, 817], "confidence": 0.111, "deleted": true, "id": "sam3_det_004", "label": "dolphin", "mask_area_px": 1054, "mask_color": "#8B5CF6", "polygon": [[767, 788], [767, 791], [769, 794], [769, 796], [770, 797], [771, 797], [773, 799], [773, 800], [783, 810], [788, 812], [793, 816], [795, 816], [796, 817], [800, 817], [800, 802], [801, 801], [801, 796], [800, 795], [800, 793], [799, 792], [799, 791], [796, 788], [795, 788], [794, 787], [792, 787], [791, 786], [778, 786], [777, 787], [768, 787]], "polygons": [[[767, 788], [767, 791], [769, 794], [769, 796], [770, 797], [771, 797], [773, 799], [773, 800], [783, 810], [788, 812], [793, 816], [795, 816], [796, 817], [800, 817], [800, 802], [801, 801], [801, 796], [800, 795], [800, 793], [799, 792], [799, 791], [796, 788], [795, 788], [794, 787], [792, 787], [791, 786], [778, 786], [777, 787], [768, 787]]]}, {"bbox_normalized": [0.743, 0.425, 0.796, 0.467], "bbox_xyxy": [802, 816, 860, 896], "confidence": 0.126, "deleted": true, "id": "sam3_det_005", "label": "dolphin", "mask_area_px": 4640, "mask_color": "#8B5CF6", "polygon": [[802, 816], [803, 824], [807, 832], [810, 835], [814, 843], [819, 848], [828, 864], [840, 878], [848, 891], [853, 896], [856, 896], [857, 888], [855, 876], [860, 864], [859, 860], [850, 856], [831, 836], [818, 828], [807, 818]], "polygons": [[[802, 816], [803, 824], [807, 832], [810, 835], [814, 843], [819, 848], [828, 864], [840, 878], [848, 891], [853, 896], [856, 896], [857, 888], [855, 876], [860, 864], [859, 860], [850, 856], [831, 836], [818, 828], [807, 818]]]}, {"bbox_normalized": [0.719, 0.45, 0.742, 0.479], "bbox_xyxy": [776, 864, 801, 919], "confidence": 0.93, "deleted": false, "id": "user_box_1784790364382", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 1072, "mask_color": "#8B5CF6", "polygon": [[789, 864], [781, 874], [777, 882], [777, 891], [779, 895], [779, 900], [778, 901], [778, 905], [776, 908], [776, 910], [782, 917], [784, 918], [794, 919], [799, 915], [801, 911], [801, 905], [800, 904], [800, 901], [799, 900], [799, 898], [797, 894], [797, 891], [796, 890], [796, 884], [795, 883], [795, 879], [794, 878], [793, 866], [792, 864]], "polygons": [[[789, 864], [781, 874], [777, 882], [777, 891], [779, 895], [779, 900], [778, 901], [778, 905], [776, 908], [776, 910], [782, 917], [784, 918], [794, 919], [799, 915], [801, 911], [801, 905], [800, 904], [800, 901], [799, 900], [799, 898], [797, 894], [797, 891], [796, 890], [796, 884], [795, 883], [795, 879], [794, 878], [793, 866], [792, 864]]]}, {"bbox_normalized": [0.71, 0.409, 0.797, 0.467], "bbox_xyxy": [767, 786, 861, 896], "confidence": 0.953, "deleted": false, "id": "user_box_1784790088723", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 8065, "mask_color": "#8B5CF6", "polygon": [[769, 787], [767, 790], [770, 797], [800, 823], [845, 887], [853, 896], [857, 896], [855, 876], [861, 864], [860, 860], [850, 856], [831, 836], [808, 819], [801, 810], [801, 795], [797, 789], [789, 786]], "polygons": [[[769, 787], [767, 790], [770, 797], [800, 823], [845, 887], [853, 896], [857, 896], [855, 876], [861, 864], [860, 860], [850, 856], [831, 836], [808, 819], [801, 810], [801, 795], [797, 789], [789, 786]]]}, {"bbox_normalized": [0.671, 0.39, 0.701, 0.416], "bbox_xyxy": [725, 748, 757, 798], "confidence": 0.93, "deleted": false, "id": "user_box_1784797821655", "is_propagated": false, "is_user_drawn": true, "label": "dolphin", "mask_area_px": 1248, "mask_color": "#8B5CF6", "polygon": [[727, 748], [725, 750], [726, 751], [726, 756], [729, 760], [730, 765], [732, 768], [732, 770], [735, 775], [735, 777], [737, 780], [737, 782], [740, 788], [742, 790], [743, 793], [747, 797], [749, 798], [754, 798], [756, 796], [756, 794], [757, 793], [757, 789], [756, 788], [755, 783], [738, 760], [734, 750], [732, 748]], "polygons": [[[727, 748], [725, 750], [726, 751], [726, 756], [729, 760], [730, 765], [732, 768], [732, 770], [735, 775], [735, 777], [737, 780], [737, 782], [740, 788], [742, 790], [743, 793], [747, 797], [749, 798], [754, 798], [756, 796], [756, 794], [757, 793], [757, 789], [756, 788], [755, 783], [738, 760], [734, 750], [732, 748]]]}], "frame_index": 2, "height": 1920, "image_url": "assets/8kUHBdHqE2s_frame_00002.jpg", "is_processed": true, "json_filename": "8kUHBdHqE2s_frame_00002_sam3.json", "json_url": "assets/8kUHBdHqE2s_frame_00002_sam3.json", "min_confidence": 0.0, "raw_image_url": "assets/8kUHBdHqE2s_frame_00002.jpg", "target_prompts": ["dolphin"], "thumbnail_url": "assets/thumbs/8kUHBdHqE2s_frame_00002.jpg", "timestamp_sec": 2.0, "verification": {"deleted_detections": ["sam3_det_001", "sam3_det_002", "sam3_det_003", "sam3_det_004", "sam3_det_005"], "json_filename": "8kUHBdHqE2s_frame_00002_verify.json", "status": "modified", "updated_at": "2026-07-25T12:28:17.431344+00:00", "video_id": "8kUHBdHqE2s"}, "video_id": "8kUHBdHqE2s", "width": 1080}], "title": "Dolphin Swim Video (Static)", "video_id": "8kUHBdHqE2s"}]; window.PLAYLIST_NAME = "dolphin"; window.TARGETS_STR = "dolphin"; window.INITIAL_VIDEO_ID = "8kUHBdHqE2s"; window.INITIAL_FRAME_INDEX = 0; window.INITIAL_IMAGE_NAME = "";
+
+    // Dynamic epoch completion time estimation helper
+    document.addEventListener("DOMContentLoaded", function () {
+      function updateEstimation(inputId, estId) {
+        const input = document.getElementById(inputId);
+        const est = document.getElementById(estId);
+        if (input && est) {
+          const val = parseInt(input.value, 10) || 0;
+          const totalSeconds = val * 12;
+          const mins = Math.floor(totalSeconds / 60);
+          const secs = totalSeconds % 60;
+          let timeText = "";
+          if (mins > 0) {
+            timeText = `~${mins}.${Math.round(secs / 6)} mins`;
+          } else {
+            timeText = `~${secs} secs`;
+          }
+          est.textContent = `Estimated duration: ${timeText} (based on ~12s/epoch)`;
+        }
+      }
+      
+      const inputs = [
+        { inputId: "train-confirm-epochs", estId: "train-confirm-epochs-est" },
+        { inputId: "classification-untrained-epochs", estId: "classification-untrained-epochs-est" }
+      ];
+
+      inputs.forEach(item => {
+        const el = document.getElementById(item.inputId);
+        if (el) {
+          el.addEventListener("input", () => updateEstimation(item.inputId, item.estId));
+          // Also listen to change / keyup events
+          el.addEventListener("keyup", () => updateEstimation(item.inputId, item.estId));
+          el.addEventListener("change", () => updateEstimation(item.inputId, item.estId));
+          updateEstimation(item.inputId, item.estId);
+        }
+      });
+    });
+  </script>
+  
+  <script>
+    // Intercept fetch calls to mock APIs for this static shell
+    (function() {
+      const originalFetch = window.fetch;
+      window.fetch = async function(url, options) {
+        const urlStr = typeof url === 'string' ? url : (url.url || '');
+        
+        // 1. Mock labels CSV
+        if (urlStr.includes('/api/dataset/labels')) {
+          return new Response(JSON.stringify({
+            success: true,
+            playlist_name: "dolphin",
+            labels: ["dolphin", "whale"],
+            csv: "dolphin, whale"
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // 2. Mock GPU stats
+        if (urlStr.includes('/api/gpu/stats')) {
+          return new Response(JSON.stringify({
+            success: true,
+            gpus: [
+              {
+                name: "NVIDIA GeForce RTX 4090",
+                index: 0,
+                occupied_mem_mb: 4850,
+                total_mem_mb: 24576,
+                loaded_models: [
+                  { name: "SAM3 Segmenter", size_gb: 4.5 },
+                  { name: "ResNet Crop Classifier", size_gb: 0.15 }
+                ]
+              }
+            ],
+            cpu_models: [],
+            model_states: {
+              sam3: { status: "completed", device: "cuda:0" },
+              resnet: { status: "completed", device: "cuda:0" },
+              yolo: { status: "offline", device: null }
+            }
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // 3. Mock GPU control
+        if (urlStr.includes('/api/gpu/control')) {
+          return new Response(JSON.stringify({
+            success: true,
+            message: "Model control mock executed successfully."
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // 4. Mock dataset crops
+        if (urlStr.includes('/api/classifier/dataset/crops')) {
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+        // 5. Mock train status
+        if (urlStr.includes('/api/classifier/train-status')) {
+          return new Response(JSON.stringify({
+            success: true,
+            status: "idle"
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // 6. Generic mock response for any other API route
+        if (urlStr.includes('/api/')) {
+          return new Response(JSON.stringify({
+            success: true,
+            message: "Mock API action successful"
+          }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        return originalFetch.apply(this, arguments);
+      };
+      
+      // Stub window.postApi if defined elsewhere
+      window.postApi = function(endpoint, dataObj, callback) {
+        if (callback) {
+          callback({ success: true, message: "Mock postApi action successful" });
+        }
+      };
+    })();
+  </script>
+\n  <script src="js/frame_stepper.js"></script>
+  <script src="js/unified_svg.js?v=20260723_v2"></script>
+  <script src="js/unified_box_drawer.js?v=20260723_v2"></script>
+  <script src="js/unified_zoom.js?v=20260723_v2"></script>
+  <script src="js/unified_ui_helpers.js?v=20260725_v2"></script>
+  <script src="js/unified_thumbnails.js?v=20260725_v1"></script>
+  <script src="js/unified_label_manager.js?v=20260724_v1"></script>
+  <script src="js/unified_thumbnail_strip.js?v=20260724_v1"></script>
+  <script src="js/unified_propagator.js?v=20260723_v2"></script>
+  <script src="js/unified_crop_detector.js?v=20260723_v2"></script>
+  <script src="js/unified_fit_widgets.js?v=20260724_v1"></script>
+  <script src="js/unified_shortcuts.js?v=20260724_v1"></script>
+  <script src="js/unified_preloader.js?v=20260724_v1"></script>
+  <script src="js/unified_viewer_helpers.js?v=20260724_v1"></script>
+  <script src="js/unified_dataset_viewer.js?v=20260725_v1"></script>
+  <script src="js/unified_classifier_modal.js?v=20260725_v2"></script>
+  <script src="js/classifier_training_flow.js?v=20260725_v2"></script>
+  <script src="js/album_training_stepper.js?v=20260725_v2"></script>
+  <script src="js/unified_viewer.js?v=20260724_v1"></script>
+  <script src="js/crop_override.js?v=20260725_v2"></script>
+  <script src="js/crop_state_indicator.js?v=20260725_v1"></script>
+  <script src="js/unified_bottombar_buttons.js?v=20260725_v1"></script>
+  
+  <!-- GPU Management Panel Overlay -->
+  <div id="gpu-management-panel" class="gpu-overlay-panel">
+    <div class="gpu-panel-header">
+      <div class="gpu-panel-title">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3M9 9h6v6H9z"/></svg>
+        GPU Management
+      </div>
+      <button class="gpu-close-btn" onclick="window.GpuManager.closePanel()">&times;</button>
+    </div>
+    
+    <div class="gpu-panel-content">
+      <div class="gpu-section-title">Devices & Usage</div>
+      <div id="gpu-device-list">
+        <!-- Populated dynamically by JS -->
+      </div>
+      
+      <div class="gpu-section-title">Active Models</div>
+      <div id="gpu-model-list">
+        <!-- Populated dynamically by JS -->
+      </div>
+    </div>
+    
+    <div class="gpu-panel-footer">
+      <button id="gpu-panel-refresh-btn" class="gpu-btn-refresh">
+        <svg id="gpu-panel-refresh-btn-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M2.5 16l1.2 1.2A10 10 0 0 0 22 12.5"/></svg>
+        Refresh Status
+      </button>
+      <div id="gpu-panel-spinner" class="gpu-spinner"></div>
+    </div>
+  </div>
+
+  <script src="js/gpu_manager.js"></script>
+</body>
+</html>

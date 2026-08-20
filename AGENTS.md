@@ -42,6 +42,7 @@
 
 ## §7 — Testing
 - Run targeted tests per module (e.g. `npx vitest run <file>`). Zero failures required.
+- **2-Pass Testing & Screenshots:** Test twice with flag (Pass 1: no screenshots; Pass 2: only after Pass 1 is OK, capture numbered screenshots starting from main window into `screenshots/cycle-{c}/{taskid}-{slug}/<num>-<step>.png`).
 
 ## §8 — UI Simplicity
 - Clean, minimal, dense presentation. Cut unnecessary modals/sidebars/config layers. Automation-first.

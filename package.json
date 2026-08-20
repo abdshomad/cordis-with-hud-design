@@ -1,0 +1,21 @@
+{
+  "name": "cordis-hud-app",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Minimalist Cordis microkernel with HUD Design plugin workspace",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cordis": "^4.0.0-rc.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
